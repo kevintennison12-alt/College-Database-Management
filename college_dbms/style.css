@@ -1,0 +1,209 @@
+/* ==========================================================
+ * AI Recognition Hub UI Stylesheet
+ * Theme: Glassmorphism Dark (Error-Free, Optimized Version)
+ * ========================================================== */
+
+/* === THEME VARIABLES === */
+:root {
+  --gradient-bg: linear-gradient(135deg, #111827 0%, #1e293b 40%, #0f172a 100%);
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --border-glass: rgba(255, 255, 255, 0.15);
+  --shadow-glow: 0 0 20px rgba(91, 124, 255, 0.15);
+  --accent-blue: #5b7cff;
+  --accent-green: #10b981;
+  --accent-purple: #9333ea;
+  --text-high: #e2e8f0;
+  --text-medium: #94a3b8;
+}
+
+/* === BASE STYLES === */
+body {
+  margin: 0;
+  font-family: 'Poppins', sans-serif;
+  background: var(--gradient-bg);
+  color: var(--text-high);
+  overflow-x: hidden;
+  min-height: 100vh;
+  background-attachment: fixed;
+  text-align: left;
+}
+
+/* === LAYOUT & ALIGNMENT === */
+.app.container {
+  max-width: 90% !important;
+  margin: 40px 0 40px 40px !important;
+  padding: 0 20px;
+  animation: fadeIn 0.8s ease;
+}
+
+.text-center,
+.mx-auto {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+/* === PANEL STYLES === */
+.panel {
+  backdrop-filter: blur(20px);
+  background: var(--glass-bg);
+  border: 1px solid var(--border-glass);
+  border-radius: 16px;
+  box-shadow: var(--shadow-glow);
+  padding: 30px;
+  transition: all 0.4s ease;
+}
+
+.panel:hover {
+  border-color: rgba(91, 124, 255, 0.4);
+  box-shadow: 0 0 25px rgba(91, 124, 255, 0.2);
+}
+
+/* === TITLES === */
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, #5b7cff, #10b981);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  position: relative;
+}
+
+.subtitle {
+  font-weight: 300;
+  color: var(--text-medium);
+}
+
+/* Title underline glow */
+.title::after {
+  content: "";
+  display: block;
+  width: 60px;
+  height: 4px;
+  margin-top: 8px;
+  background: linear-gradient(90deg, #5b7cff, #10b981);
+  border-radius: 2px;
+  animation: glow 2s infinite alternate;
+}
+
+/* === VIDEO FRAME === */
+#video-frame {
+  width: 100%;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.6);
+  object-fit: cover;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+  transition: transform 0.3s ease;
+}
+
+/* === CONTROLS PANEL === */
+.controls-panel {
+  backdrop-filter: blur(20px);
+  background: var(--glass-bg);
+  border: 1px solid var(--border-glass);
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.3s ease;
+}
+
+/* === BUTTONS === */
+.btn {
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  transition: all 0.25s ease;
+  color: var(--text-high);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-glass);
+  cursor: pointer;
+}
+
+.btn.active {
+  box-shadow: 0 0 15px rgba(91, 124, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Active Mode Coloring */
+#idle-btn.active {
+  background: var(--accent-green);
+  color: #fff;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+}
+
+#digit-btn.active {
+  background: var(--accent-blue);
+  color: #fff;
+}
+
+#object-btn.active {
+  background: var(--accent-green);
+  color: #fff;
+}
+
+/* Gesture Button */
+#gesture-btn {
+  background: var(--accent-purple);
+  color: #fff;
+}
+
+#gesture-btn.active {
+  background: var(--accent-purple);
+  box-shadow: 0 0 15px rgba(147, 51, 234, 0.6);
+  color: #fff;
+}
+
+/* TTS & HELP Buttons */
+#tts-btn,
+#help-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-glass);
+  color: var(--text-high);
+}
+
+#tts-btn:hover,
+#help-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* === TEXT ELEMENTS === */
+hr {
+  opacity: 0.1;
+}
+
+.footer-note {
+  font-size: 0.85rem;
+  color: var(--text-medium);
+  text-align: left;
+  margin-top: 10px;
+}
+
+.small-muted {
+  text-align: left;
+}
+
+/* === ANIMATIONS === */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes glow {
+  from {
+    opacity: 0.5;
+    box-shadow: 0 0 10px #5b7cff;
+  }
+  to {
+    opacity: 1;
+    box-shadow: 0 0 20px #10b981;
+  }
+}

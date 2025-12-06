@@ -1,0 +1,558 @@
+1)single level
+
+#include <iostream>
+using namespace std;
+class Parent{
+    public:
+  void Love(){
+      cout<<"My Parents love me";
+  }  
+  void Suppor(){
+      cout<<"My Parents Support me";
+  }
+  void Hardwork(){
+      cout<<"My Parents are Hardworking\n";
+  }
+};
+class Child:public Parent{
+    public:
+    void usesnapchat(){
+        cout<<"Child uses snapchat\n";
+    }
+};
+int main() {
+   Parent p;
+   Child c;
+p.Hardwork();
+c.usesnapchat();
+c.Hardwork();
+    return 0;
+}
+
+
+
+
+
+2).multilevel
+
+#include <iostream>
+using namespace std;
+class myself{
+    public:
+    void viewname(){
+        cout<<"kruthi\n";
+    }
+    void viewpics(){
+        cout<<"picture\n";
+    }
+    private:
+    void setname(){
+        cout<<"set name";
+    }
+    void upload(){
+        cout<<"picture";
+    }
+};
+class followers:public myself{
+};
+
+int main() {
+    myself m;
+    followers f;
+    f.viewname();
+    f.viewpics();
+return 0;
+}
+
+
+
+3).hierachy
+
+
+// Online C++ compiler to run C++ program online
+#include <iostream>
+using namespace std;
+class Camera{
+    public:
+    void pic(){
+        cout<<"camera clicks pics\n";
+    }
+    void video(){
+        cout<<"camera can make videos\n ";
+    }
+    
+};
+class Calci{
+    public:
+    void add(){
+        cout<<"calci can add\n";
+    }
+    void sub(){
+        cout<<"calci can subtract\n";
+    }
+};
+class Smartphone:public Calci,public Camera{
+    public:
+    void text(){
+        cout<<"can text\n";
+    }
+    void call(){
+        cout<<"can call\n";
+    }
+};
+int main() {
+  Camera c;
+  Calci t;
+  Smartphone s;
+  s.add();
+  s.sub();
+  s.pic();
+  s.video();
+  
+    return 0;
+}
+
+
+
+4).multiple
+
+
+// Online C++ compiler to run C++ program online
+#include <iostream>
+using namespace std;
+class Animal{
+    public:
+    void eat(){
+        cout<<"animal eats\n";
+    }
+    void sleep(){
+        cout<<"animal sleeps\n";
+    }
+};
+class Dog:public Animal{
+    public:
+    void bark(){
+        cout<<"bow bow\n";
+    }
+};
+class Cat:public Animal{
+    public:
+    void meow(){
+        cout<<"meow meow\n";
+    }
+};
+int main() {
+   Animal a;
+   Cat c;
+   Dog d;
+   d.sleep();
+   c.eat();
+   c.meow();
+   d.bark();
+    return 0;
+}
+
+
+
+
+5).
+
+#include <iostream>
+using namespace std;
+class Calci{
+    public:
+    void add(int a,int b){
+        cout<<a+b<<endl;
+    }
+    void add(float a,float b,float c){
+        cout<<a+b+c;
+    }
+};
+int main() {
+ Calci c;
+ c.add(7,8);
+ c.add(3.5,4.8,6.5);
+ return 0;
+}
+
+
+6).
+
+
+
+#include <iostream>
+using namespace std;
+class Bird{
+    public:
+    void eat(){
+        cout<<"all birds eat\n";
+    }
+    void sleep(){
+        cout<<"all birds sleep\n";
+    }
+    void fly(){
+        cout<<"most birds fly\n";
+    }
+};
+class Eagle:public Bird{
+    public:
+    void fly(){
+        cout<<"eagle can fly\n";
+    }
+};
+class Penguin:public Bird{
+    public
+    void fly(){
+        cout<<"it cannot fly\n";
+    }
+};
+int main() {
+    Bird b; 
+   Eagle e;
+   Penguin p;
+   b.fly();
+   e.fly();
+   p.fly();
+   e.sleep();
+    return 0;
+}
+
+
+7).
+
+
+// Online C++ compiler to run C++ program online
+#include <iostream>
+using namespace std;
+class Plane{
+    public:
+    void fly(){
+        cout<<"all planes fly"<<endl;
+    }
+};
+class Cargo:public Plane{
+    public:
+    void fly(){
+        cout<<"carry goods"<<endl;
+    }
+};
+class Passanger:public Plane{
+    public:
+    void fly(){
+        cout<<"carry pasenger"<<endl;
+    }
+};
+class Fighter:public Plane{
+    public:
+    void fly(){
+        cout<<"it has fighters"<<endl;
+    }
+};
+int main() {
+   Plane p;
+   Cargo c;
+   Passanger l;
+   Fighter f;
+   p.fly();
+   c.fly();
+   l.fly();
+   f.fly();
+    return 0;
+}
+
+
+
+8).
+
+#include <iostream>
+using namespace std;
+class Shape{
+    public:
+    void Area(){
+        cout<<"all shapes have different areas"<<endl;
+    }
+};
+class Circle:public Shape{
+    public:
+    void Area() {
+      int r;
+      cout<<"enter the value of radius "<<endl;
+      cin>>r;
+      int A=3.14*r*r;
+      cout<<A;
+    }   
+    
+};
+class rectangle:public Shape{
+    public:
+    void Area(){
+        int l, b;
+      cout<<"enter the value of l and b"<<endl;
+      cin>>l>>b;
+      int A1=l*b;
+      cout<<A1;
+    }
+    
+};
+class triangle:public Shape{
+    public:
+    void Area(){
+        int b, h;
+      cout<<"enter the value of b and h"<<endl;
+      cin>>b>>h;
+      int A2=0.5*b*h;
+      cout<<A2;
+    }
+    
+};
+
+
+int main() {
+    Shape s;
+    Circle c;
+    rectangle r;
+    triangle t;
+    s.Area();
+    c.Area();
+    r.Area();
+    t.Area();
+}
+
+
+9).
+
+#include <iostream>
+using namespace std;
+class animal{
+    virtual void sound()=0;
+};
+class Dog:public animal{
+    public:
+    void sound(){
+        cout<<"bow bow"<<endl;
+    }
+};
+class cat:public animal{
+    public:
+    void sound(){
+        cout<<"meow meow"<<endl;
+        }
+};
+int main(){
+    cat c;
+    Dog d;
+   c.sound();
+    d.sound();
+}
+
+
+
+
+10).
+
+#include <iostream>
+using namespace std;
+class Employee{
+    public:
+    virtual void salary()=0;
+    virtual void name()=0;
+};
+class Manager:public Employee{
+    public:
+    void salary(){
+        cout<<15000<<endl;
+    }
+    void name(){
+    cout<<"kru"<<endl;
+    }
+};
+class Developer:public Employee{
+    public:
+    void salary(){
+        cout<<1800<<endl;
+    }
+    void name(){
+        cout<<"yashu"<<endl;
+    }
+};
+int main() {
+   Manager m;
+   Developer d;
+   m.salary();
+   m.name();
+   d.salary();
+   d.name();
+    return 0;
+}
+
+
+
+11).
+
+
+#include <iostream>
+using namespace std;
+int main(){
+int a=10,b=0;
+try{
+    if(b==0)
+    throw runtime_error("zero Division");
+    else
+    cout<<a/b;
+}
+catch(const runtime_error e){
+    cout<<"error has occured";
+}
+}
+
+
+
+12).
+
+#include <iostream>
+using namespace std;
+struct student{
+    string name;
+    int marks;963
+     student(string n,int m,int a){
+        name=n;
+        marks=m;
+        attendance=a;
+    }
+    void print(){
+        cout<<name<<endl<<marks<<endl<<attendance;
+    }
+};
+
+int main() {
+    student s("kruthi",45,65);
+    s.print();
+       return 0;
+}
+
+
+
+13).
+
+#include <iostream>
+using namespace std;
+struct Employee{
+    string name;
+    int age;
+    int salary;
+    string dept;
+     Employee(string n,int a,int s,string d){
+        name=n;
+        age=a;
+        salary=s*1.1;
+        dept=d;
+     }
+
+  void print(){
+   cout<<"enter name";
+   cin>>name;
+   cout<<"dept";
+   cin>>dept;
+   cout<<"age";
+   cin>>age;
+   cout<<"salary";
+   cin>>salary
+}
+};
+
+int main() {
+ Employee e(name,dept,age,salary);
+ e.print();
+    return 0;
+}
+
+
+
+14).
+
+
+#include <iostream>
+using namespace std;
+struct Grocery{
+    int id;
+    string brand;
+    float price;
+    Grocery(int i,string b,float p){
+        id=i;
+        brand=b;
+        price=p;
+    
+    }
+    void msg(){
+        if(price>1000){
+            cout<<"alert:price is greater than 1000\n";
+        }
+    }
+    void voucher(){
+        int v=price*5/100;
+        if(v<500)
+        cout<<v<<endl;
+        else
+        cout<<500<<endl;
+    }
+    void print(){
+        cout<<id<<brand<<price;
+    }
+};
+int main() {
+    Grocery g1(01,"teju",2000);
+     Grocery g2(02,"aachi",1300);
+    g1.msg();
+    g1.voucher();
+    g2.msg();
+    g2.voucher();
+   
+    return 0;
+}
+
+
+
+15).
+
+
+
+#include <iostream>
+#include<set>
+using namespace std;
+int main() {
+    set<int>s;
+    int n;
+    for(int i=0;i<5;i++){
+    cin>>n;
+    s.insert(n);
+}
+for(int i:s)
+cout<<i<<endl;
+return 0;
+}
+
+
+
+
+16).
+
+
+
+#include <iostream>
+#include<list>
+using namespace std;
+int main() {
+    list<float> l={1,2,3.5,4.5,4,4,7};
+    l.push_front(7);
+    for(float i:l){
+cout<<i<<endl;
+}
+return 0;
+}
+
+
+
+
+17).
+
+

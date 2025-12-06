@@ -1,0 +1,381 @@
+app.PY
+"""
+Professional Flask web app that streams processed webcam frames (MJPEG).
+
+Features:
+ - Digit Recognition (MNIST CNN)
+ - Object Recognition (YOLOv8N) - Consolidated version with improved text rendering.
+
+Dependencies (MUST be installed in a stable environment like Python 3.10):
+    pip install flask opencv-python ultralytics tensorflow==2.16.1 keras numpy==1.26.4
+"""
+import time
+import threading
+import os
+import sys
+
+from flask import Flask, render_template, Response, jsonify, request
+import cv2
+import numpy as np
+
+# --- Initialize ML Libraries with Graceful Failure ---
+YOLO = None
+keras = None
+tf = None
+
+try:
+    from ultralytics import YOLO as YOLO_CLS
+    YOLO = YOLO_CLS
+    print("SUCCESS: Ultralytics YOLO module loaded.")
+except ImportError:
+    print("WARNING: Ultralytics YOLO not available (ImportError). Object mode will be disabled.")
+    print("HINT: If you see this, ensure 'ultralytics' and 'torch' are installed in Python 3.10.")
+except Exception as e:
+    print(f"WARNING: Failed to load YOLO: {e}. Object mode disabled.")
+
+try:
+    import tensorflow as tf
+    from tensorflow import keras
+    print("SUCCESS: TensorFlow/Keras module loaded.")
+except ImportError:
+    print("WARNING: Keras/TensorFlow not available. Digit mode will be disabled.")
+except Exception as e:
+    print(f"WARNING: Failed to load TensorFlow/Keras: {e}. Digit mode disabled.")
+
+# --- App Setup ---
+app = Flask(__name__)
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+# Global state
+MODE = "idle"   # idle | digit | object
+FRAME_LOCK = threading.Lock()
+CURRENT_FRAME = None
+SAVE_DIR = "captures"
+os.makedirs(SAVE_DIR, exist_ok=True)
+
+# ----- Friendly Descriptions Dictionary (EXPANDED) -----
+OBJECT_DESCRIPTIONS = {
+    "person": "A human detected. They are moving or stationary.",
+    "bottle": "A container for holding liquid, likely water or soda.",
+    "chair": "A piece of furniture used for sitting.",
+    "laptop": "A portable computer used for work or entertainment.",
+    "cell phone": "A mobile communication device.",
+    "car": "An automobile used for transportation.",
+    "book": "This is a book. People read it to learn or for entertainment.",
+    "cup": "This is a cup. It’s used to drink tea, coffee, or other drinks.",
+    "tv": "This is a television. People watch shows and movies on it.",
+    "dog": "This is a dog. Dogs are pets that often help people and provide companionship.",
+    "cat": "This is a cat. A small pet that people keep at home for companionship.",
+    "refrigerator": "This is a refrigerator. It keeps food and drinks cold to preserve them.",
+    "keyboard": "This is a keyboard. People use it to type on computers.",
+    "mouse": "This is a mouse. It’s a computer input device used to control a cursor.",
+    "bicycle": "This is a bicycle. It’s used for short-distance travel and exercise; you pedal to move.",
+    "bus": "This is a bus. It carries many passengers on set routes in cities or between towns.",
+    "truck": "This is a truck. Trucks are used for transporting heavy goods and materials.",
+}
+
+def describe_object(name: str) -> str:
+    """Provides a friendly description for a detected object."""
+    name = name.lower()
+    return OBJECT_DESCRIPTIONS.get(name, f"This is a {name}. It's a common object.")
+
+# ----- Digit Model Utilities (UNMODIFIED) -----
+DIGIT_MODEL_PATH = "models/digit_model.h5"
+digit_model = None
+
+def train_or_load_digit_model():
+    """Trains a simple MNIST model if the file doesn't exist, or loads it."""
+    global digit_model
+    if digit_model is not None:
+        return digit_model
+    if keras is None:
+        return None
+    
+    # Try loading the model
+    if os.path.exists(DIGIT_MODEL_PATH):
+        try:
+            digit_model = keras.models.load_model(DIGIT_MODEL_PATH)
+            print("INFO: Loaded existing digit model.")
+            return digit_model
+        except Exception as e:
+            print(f"ERROR: Failed to load digit model from disk: {e}. Attempting to retrain.")
+
+    # Train a small model quickly (uses MNIST)
+    print("INFO: Training digit model (MNIST) — this may take a while. The application will pause.")
+    try:
+        (x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
+        x_train = x_train.reshape(-1,28,28,1).astype("float32")/255.0
+        x_test = x_test.reshape(-1,28,28,1).astype("float32")/255.0
+        
+        model = keras.Sequential([
+            keras.layers.Conv2D(32,(3,3),activation='relu',input_shape=(28,28,1)),
+            keras.layers.MaxPooling2D((2,2)),
+            keras.layers.Flatten(),
+            keras.layers.Dense(10, activation='softmax')
+        ])
+        model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+        model.fit(x_train, y_train, epochs=2, validation_data=(x_test,y_test), verbose=0)
+        
+        os.makedirs('models', exist_ok=True)
+        model.save(DIGIT_MODEL_PATH)
+        digit_model = model
+        print("SUCCESS: Digit model trained and saved.")
+        return digit_model
+    except Exception as e:
+        print(f"FATAL ERROR: Failed to train MNIST model. {e}")
+        return None
+
+# ----- Object Model Utilities -----
+object_model = None
+YOLO_MODEL_NAME = "yolov8n.pt" 
+
+def load_yolo_model(model_path=YOLO_MODEL_NAME):
+    """Loads the YOLOv8 model."""
+    global object_model
+    if object_model is not None:
+        return object_model
+    if YOLO is None:
+        return None
+    try:
+        object_model = YOLO(model_path)
+        print(f"SUCCESS: YOLO model ({model_path}) loaded.")
+        return object_model
+    except Exception as e:
+        print(f"ERROR: Failed to load YOLO model: {e}")
+        return None
+
+# ----- Camera Capture Thread (FIXED CAMERA FLIP) -----
+def camera_loop(source=0):
+    """
+    Attempts to open the webcam using multiple OpenCV backends for robustness.
+    Includes the fix for inverted (mirrored) camera feed.
+    """
+    global CURRENT_FRAME
+    
+    backends = [
+        cv2.CAP_DSHOW,      # 700 - DirectShow (Often best on Windows)
+        cv2.CAP_MSMF,       # 700 - Media Foundation (Windows default, sometimes conflicts)
+        cv2.CAP_V4L2,       # 200 - Linux (V4L2)
+        cv2.CAP_ANY         # 0 - Let OpenCV choose (Default fallback)
+    ]
+
+    cap = None
+    opened = False
+    
+    for backend in backends:
+        print(f"INFO: Attempting to open camera {source} with backend {backend}...")
+        try:
+            cap = cv2.VideoCapture(source, backend)
+            if cap.isOpened():
+                print(f"SUCCESS: Camera opened using backend {backend}.")
+                opened = True
+                break
+            if cap:
+                cap.release()
+        except Exception:
+            pass
+            
+    if not opened or cap is None:
+        print(f"FATAL ERROR: Could not open webcam at source {source} using any known backend.")
+        return 
+
+    # Camera successfully opened. Start the frame capture loop.
+    time.sleep(0.5) # Warmup time
+    while True:
+        try:
+            ret, frame = cap.read()
+            if not ret:
+                print("WARNING: Failed to read frame from camera. Re-attempting...")
+                time.sleep(0.1)
+                continue
+        
+            # *** FIX: Apply horizontal flip (mirroring correction) ***
+            frame = cv2.flip(frame, 1)
+            
+            # Update the global frame buffer
+            with FRAME_LOCK:
+                CURRENT_FRAME = frame.copy()
+            time.sleep(0.03)  # Small sleep to yield CPU time
+        except Exception as e:
+            print(f"ERROR in camera thread: {e}")
+            time.sleep(2)
+            break
+    
+    if cap:
+        cap.release()
+        print("INFO: Camera thread exited and camera released.")
+
+
+# start camera thread
+t = threading.Thread(target=camera_loop, daemon=True)
+t.start()
+
+# ----- Frame Processing and MJPEG Stream (IMPROVED TEXT RENDERING) -----
+def process_frame_for_stream():
+    """
+    Grab current frame, process based on MODE, and return JPEG bytes.
+    """
+    global CURRENT_FRAME, MODE
+    
+    # 1. Grab Frame
+    with FRAME_LOCK:
+        frame = CURRENT_FRAME.copy() if CURRENT_FRAME is not None else None
+    
+    if frame is None:
+        # Return a placeholder if the camera has not provided a frame yet
+        blank = np.zeros((480,640,3), dtype=np.uint8)
+        cv2.putText(blank, "Waiting for camera...", (50,240), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200,200,200), 2)
+        ret, jpeg = cv2.imencode('.jpg', blank)
+        return jpeg.tobytes()
+        
+    h,w = frame.shape[:2]
+
+    # 2. Process based on Mode
+    if MODE == "idle":
+        cv2.putText(frame, "Mode: Idle", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (200,200,200), 2)
+        
+    elif MODE == "digit":
+        model = train_or_load_digit_model()
+        if model is None:
+             cv2.putText(frame, "Digit Model Not Available", (10,60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255),2)
+        else:
+            try:
+                # Define ROI (Region of Interest)
+                x, y, box_w, box_h = int(w*0.35), int(h*0.2), int(w*0.3), int(h*0.45)
+                cv2.rectangle(frame, (x,y), (x+box_w, y+box_h), (0,255,0), 2)
+                
+                # Preprocess ROI for MNIST model
+                roi = cv2.cvtColor(frame[y:y+box_h, x:x+box_w], cv2.COLOR_BGR2GRAY)
+                roi_resized = cv2.resize(roi, (28,28))
+                _, roi_thresh = cv2.threshold(roi_resized, 128, 255, cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
+                roi_norm = roi_thresh.astype('float32')/255.0
+                inp = roi_norm.reshape(1,28,28,1)
+                
+                # Predict
+                pred = model.predict(inp, verbose=0)
+                digit = int(np.argmax(pred))
+                conf = float(np.max(pred))
+                
+                # Display results
+                cv2.putText(frame, f"Digit: {digit} ({conf*100:.1f}%)", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,0), 2)
+                
+                # Show processed ROI corner
+                small = cv2.resize(roi_thresh, (140,140))
+                frame[5:5+140, w-145:w-5] = cv2.cvtColor(small, cv2.COLOR_GRAY2BGR)
+                cv2.putText(frame, "Processed ROI", (w-145, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255),1)
+                
+            except Exception as e:
+                cv2.putText(frame, "Digit Prediction Error", (10,60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255),2)
+                print(f"ERROR: Digit prediction failed: {e}")
+                
+    elif MODE == "object":
+        model = load_yolo_model()
+        if model is None:
+            cv2.putText(frame, "YOLO Model Not Available", (10,60), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,0,255),2)
+        else:
+            try:
+                # Run detection
+                results = model(frame, verbose=False, device='cpu')[0] 
+                
+                if hasattr(results, 'boxes') and len(results.boxes) > 0:
+                    for box in results.boxes:
+                        conf = float(box.conf[0]) if box.conf is not None else 0.0
+                        
+                        # Use 0.35 confidence threshold for cleaner display
+                        CONFIDENCE_THRESHOLD = 0.35 
+                        if conf < CONFIDENCE_THRESHOLD:
+                            continue
+                            
+                        # Extract box coordinates and label
+                        xyxy = box.xyxy[0].cpu().numpy() if hasattr(box.xyxy[0], 'cpu') else np.array(box.xyxy[0])
+                        x1,y1,x2,y2 = map(int, xyxy)
+                        cls = int(box.cls[0]) if box.cls is not None else -1
+                        label = model.names.get(cls, f"class_{cls}")
+                        
+                        # Draw box and label
+                        color = (0, 200, 0) # Green
+                        cv2.rectangle(frame, (x1,y1), (x2,y2), color, 2)
+                        txt = f"{label} {conf:.2f}"
+                        # Draw label text slightly above the box
+                        cv2.putText(frame, txt, (x1, y1 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                        
+                        # --- IMPROVEMENT: Draw description directly below the box ---
+                        desc = describe_object(label)
+                        max_chars = 40
+                        y_text_start = y2 + 18 # Start text just below the box
+                        
+                        description_lines = [desc[i:i+max_chars] for i in range(0, len(desc), max_chars)]
+                        
+                        for i, line in enumerate(description_lines[:3]): # Limit to 3 lines
+                            # Draw text relative to the bottom edge of the box (y2)
+                            cv2.putText(frame, line, (x1, y_text_start + i*18), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255,255,255),1)
+                            
+            except Exception as e:
+                cv2.putText(frame, "YOLO Prediction Error", (10,60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255),2)
+                print(f"ERROR: YOLO prediction failed: {e}")
+                
+    # 3. Encode JPEG and Stream
+    ret, jpeg = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+    return jpeg.tobytes()
+
+def mjpeg_generator():
+    """MJPEG stream generator function."""
+    while True:
+        frame_bytes = process_frame_for_stream()
+        yield (b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        time.sleep(0.03) # ~30 FPS max
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(mjpeg_generator(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+# ----- UI and API Endpoints (Flask) -----
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/api/mode', methods=['POST'])
+def set_mode():
+    global MODE
+    data = request.get_json() or {}
+    mode = data.get('mode', 'idle')
+    if mode not in ['idle','digit','object']:
+        return jsonify({'status':'error','message':'invalid mode'}), 400
+    MODE = mode
+    return jsonify({'status':'ok','mode':MODE})
+
+@app.route('/api/save', methods=['POST'])
+def save_frame():
+    global CURRENT_FRAME
+    with FRAME_LOCK:
+        if CURRENT_FRAME is None:
+            return jsonify({'status':'error','message':'no frame'}), 400
+        frame_to_save = CURRENT_FRAME.copy()
+        
+    fname = f"capture_{int(time.time())}.jpg"
+    path = os.path.join(SAVE_DIR, fname)
+    
+    try:
+        cv2.imwrite(path, frame_to_save)
+        return jsonify({'status':'ok','path':path})
+    except Exception as e:
+        print(f"ERROR saving frame: {e}")
+        return jsonify({'status':'error','message':'failed to save frame'}), 500
+
+if __name__ == '__main__':
+    # Ensure models folder exists before running
+    os.makedirs('models', exist_ok=True)
+    
+    # Run the application
+    print("-" * 50)
+    print("FLASK APP STARTING")
+    print(f"Object Recognition using {YOLO_MODEL_NAME}")
+    print("NOTE: TTS functionality from object_recognition.py is removed as it's not web-compatible.")
+    print("-" * 50)
+    
+    try:
+        app.run(host='0.0.0.0', port=5000, debug=True, threaded=True, use_reloader=False) 
+    finally:
+        print("INFO: Flask application shutting down.")
+        sys.exit(0)
